@@ -7,8 +7,7 @@
   "scripts": {
     "start": "electron .",
     "build:mac": "electron-builder --mac dir",
-    "dist:mac": "electron-builder --mac dmg",
-    "release:mac": "electron-builder --mac dir dmg"
+    "release:mac": "electron-builder --mac dir"
   },
   "build": {
     "appId": "com.alchemists.allai",
@@ -24,8 +23,7 @@
     },
     "mac": {
       "target": [
-        "dir",
-        "dmg"
+        "dir"
       ],
       "category": "public.app-category.productivity",
       "icon": "build/icon.png"
