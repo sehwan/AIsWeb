@@ -71,7 +71,8 @@ function toggleApp() {
 }
 
 function createTray() {
-  const icon = createAppIcon().resize({ width: 16, height: 16 });
+  const iconPath = path.join(__dirname, 'build', 'icon.png');
+  const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
   tray = new Tray(icon);
 
   const contextMenu = Menu.buildFromTemplate([
