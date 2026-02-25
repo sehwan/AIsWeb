@@ -1,0 +1,38 @@
+{
+  "name": "ais-webview-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Desktop app with 4 AI webviews and one shared prompt input",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:mac": "electron-builder --mac dir",
+    "dist:mac": "electron-builder --mac dmg",
+    "release:mac": "electron-builder --mac dir dmg"
+  },
+  "build": {
+    "appId": "com.alchemists.allai",
+    "productName": "AllAI",
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "target": [
+        "dir",
+        "dmg"
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png"
+    }
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^24.13.3"
+  }
+}

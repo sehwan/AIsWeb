@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI 동시 질문</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+      .wrap {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 16px;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 24px;
+      }
+      .grid5 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .panel {
+        background: #111827;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 14px;
+        min-height: 0;
+      }
+      .panel.input {
+        grid-column: 1 / -1;
+        min-height: 0;
+      }
+      textarea {
+        width: 100%;
+        min-height: 110px;
+        border-radius: 10px;
+        border: 1px solid #475569;
+        background: #020617;
+        color: #f8fafc;
+        padding: 12px;
+        font-size: 14px;
+        resize: vertical;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      button {
+        border: none;
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 14px;
+        cursor: pointer;
+        color: #e2e8f0;
+        background: #1e293b;
+      }
+      #copyBtn {
+        background: #2563eb;
+      }
+      #openAllBtn {
+        background: #0ea5e9;
+      }
+      #status {
+        margin: 10px 0 0;
+        font-size: 13px;
+        color: #93c5fd;
+        min-height: 20px;
+      }
+      .panel h2 {
+        margin: 0 0 8px;
+        font-size: 17px;
+      }
+      .hint {
+        margin: 0;
+        color: #9ca3af;
+        font-size: 12px;
+      }
+      .service-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+      }
+      .service-actions button {
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+      .warn {
+        margin-top: 10px;
+        font-size: 12px;
+        color: #9ca3af;
+      }
+      .service-title {
+        margin: 0;
+        font-size: 15px;
+      }
+      .service-desc {
+        margin: 8px 0 0;
+        font-size: 13px;
+        color: #94a3b8;
+        line-height: 1.4;
+      }
+      @media (max-width: 900px) {
+        .grid5 {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>AI 4분할 보기</h1>
+      <div class="grid5">
+        <section class="panel input">
+          <h2>질문 입력 (공통)</h2>
+          <textarea id="question" placeholder="질문을 입력하세요..."></textarea>
+          <div class="actions">
+            <button id="copyBtn">질문 복사</button>
+            <button id="openAllBtn">4개 서비스 새 탭으로 열기</button>
+            <button id="newBtn">새 질문</button>
+          </div>
+          <div id="status"></div>
+          <p class="hint">무료 웹버전 기준: 질문 1번 입력 → 복사 → 각 탭에 붙여넣기</p>
+          <p class="warn">브라우저 보안 정책 때문에 외부 AI 사이트 내용을 이 페이지 안에 직접 띄우거나 자동 입력하는 것은 불가능합니다.</p>
+        </section>
+
+        <section class="panel">
+          <h2 class="service-title">ChatGPT</h2>
+          <p class="service-desc">새 탭으로 열어서 질문을 붙여넣으세요.</p>
+          <div class="service-actions">
+            <button data-url="https://chatgpt.com">새 탭 열기</button>
+            <button data-copy-only="true">질문 복사</button>
+          </div>
+        </section>
+        <section class="panel">
+          <h2 class="service-title">Google Gemini</h2>
+          <p class="service-desc">새 탭으로 열어서 질문을 붙여넣으세요.</p>
+          <div class="service-actions">
+            <button data-url="https://gemini.google.com">새 탭 열기</button>
+            <button data-copy-only="true">질문 복사</button>
+          </div>
+        </section>
+        <section class="panel">
+          <h2 class="service-title">Grok</h2>
+          <p class="service-desc">새 탭으로 열어서 질문을 붙여넣으세요.</p>
+          <div class="service-actions">
+            <button data-url="https://grok.com">새 탭 열기</button>
+            <button data-copy-only="true">질문 복사</button>
+          </div>
+        </section>
+        <section class="panel">
+          <h2 class="service-title">Perplexity</h2>
+          <p class="service-desc">새 탭으로 열어서 질문을 붙여넣으세요.</p>
+          <div class="service-actions">
+            <button data-url="https://www.perplexity.ai">새 탭 열기</button>
+            <button data-copy-only="true">질문 복사</button>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      const questionInput = document.getElementById("question");
+      const copyBtn = document.getElementById("copyBtn");
+      const openAllBtn = document.getElementById("openAllBtn");
+      const newBtn = document.getElementById("newBtn");
+      const statusEl = document.getElementById("status");
+
+      const serviceUrls = [
+        "https://chatgpt.com",
+        "https://gemini.google.com",
+        "https://grok.com",
+        "https://www.perplexity.ai"
+      ];
+
+      function saveQuestion() {
+        localStorage.setItem("aisweb.question", questionInput.value);
+      }
+
+      function resetForNewQuestion() {
+        questionInput.value = "";
+        localStorage.removeItem("aisweb.question");
+        statusEl.textContent = "새 질문을 입력해 주세요.";
+        questionInput.focus();
+      }
+
+      async function copyQuestion() {
+        const question = questionInput.value.trim();
+        if (!question) {
+          statusEl.textContent = "질문을 먼저 입력해 주세요.";
+          return;
+        }
+
+        try {
+          await navigator.clipboard.writeText(question);
+          statusEl.textContent = "질문을 클립보드에 복사했습니다. 각 서비스 창에 붙여넣으세요.";
+        } catch {
+          statusEl.textContent = "클립보드 복사에 실패했습니다. 직접 복사해 주세요.";
+        }
+      }
+
+      function openAllServices() {
+        const question = questionInput.value.trim();
+        if (!question) {
+          statusEl.textContent = "질문을 먼저 입력해 주세요.";
+          return;
+        }
+
+        serviceUrls.forEach((url) => {
+          window.open(url, "_blank", "noopener,noreferrer");
+        });
+        copyQuestion();
+        statusEl.textContent = "4개 서비스를 열고 질문도 복사했습니다.";
+      }
+
+      function loadQuestion() {
+        questionInput.value = localStorage.getItem("aisweb.question") || "";
+      }
+
+      document.querySelectorAll(".service-actions button").forEach((button) => {
+        button.addEventListener("click", () => {
+          if (button.dataset.copyOnly === "true") {
+            copyQuestion();
+            return;
+          }
+
+          const url = button.dataset.url;
+          if (url) {
+            window.open(url, "_blank", "noopener,noreferrer");
+          }
+        });
+      });
+
+      copyBtn.addEventListener("click", copyQuestion);
+      openAllBtn.addEventListener("click", openAllServices);
+      newBtn.addEventListener("click", resetForNewQuestion);
+      questionInput.addEventListener("input", saveQuestion);
+      questionInput.addEventListener("keydown", (event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+          copyQuestion();
+        }
+      });
+
+      loadQuestion();
+    </script>
+  </body>
+</html>
