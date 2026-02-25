@@ -1,10 +1,9 @@
-const { app, BrowserWindow, shell, nativeImage, Tray, Menu, globalShortcut } = require("electron");
+const { app, BrowserWindow, shell, nativeImage, globalShortcut } = require("electron");
 const path = require("path");
 
 const APP_NAME = "AllAI";
 const APP_ID = "com.alchemists.allai";
 let mainWindow = null;
-let tray = null;
 let isQuiting = false;
 
 function createAppIcon() {
@@ -78,34 +77,6 @@ function toggleApp() {
   }
 }
 
-function createTray() {
-  const iconPath = path.join(__dirname, 'build', 'icon.png');
-  const icon = nativeImage.createFromPath(iconPath).resize({ width: 20, height: 20 });
-  tray = new Tray(icon);
-  if (process.platform === "darwin") {
-    tray.setTitle(" AI"); // Text fallback in case icon fails to render
-  }
-
-  const contextMenu = Menu.buildFromTemplate([
-    { label: 'Show/Hide App', click: () => toggleApp() },
-    { type: 'separator' },
-    {
-      label: 'Quit', click: () => {
-        isQuiting = true;
-        app.quit();
-      }
-    }
-  ]);
-
-  tray.setToolTip(APP_NAME);
-  tray.on('click', () => {
-    toggleApp();
-  });
-  tray.on('right-click', () => {
-    tray.popUpContextMenu(contextMenu);
-  });
-}
-
 const gotLock = app.requestSingleInstanceLock();
 
 if (!gotLock) {
@@ -133,8 +104,6 @@ app.whenReady().then(() => {
   if (!mainWindow) {
     createWindow();
   }
-
-  createTray();
 
   globalShortcut.register("Control+Space", () => {
     toggleApp();
