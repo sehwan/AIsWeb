@@ -73,16 +73,18 @@ function toggleApp() {
 function createTray() {
   const icon = createAppIcon().resize({ width: 16, height: 16 });
   tray = new Tray(icon);
-  
+
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show/Hide App', click: () => toggleApp() },
     { type: 'separator' },
-    { label: 'Quit', click: () => {
-      isQuiting = true;
-      app.quit();
-    }}
+    {
+      label: 'Quit', click: () => {
+        isQuiting = true;
+        app.quit();
+      }
+    }
   ]);
-  
+
   tray.setToolTip(APP_NAME);
   tray.on('click', () => {
     toggleApp();
@@ -112,14 +114,14 @@ app.whenReady().then(() => {
   app.setAppUserModelId(APP_ID);
 
   if (process.platform === "darwin") {
-    const icon = createAppIcon();
-    app.dock.setIcon(icon);
+    app.dock.hide();
   }
+
 
   if (!mainWindow) {
     createWindow();
   }
-  
+
   createTray();
 
   globalShortcut.register("Control+Space", () => {
