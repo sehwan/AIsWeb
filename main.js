@@ -1,9 +1,10 @@
-const { app, BrowserWindow, shell, nativeImage, globalShortcut } = require("electron");
+const { app, BrowserWindow, shell, nativeImage, Tray, Menu, globalShortcut } = require("electron");
 const path = require("path");
 
 const APP_NAME = "AllAI";
 const APP_ID = "com.alchemists.allai";
 let mainWindow = null;
+let tray = null;
 let isQuiting = false;
 
 function createAppIcon() {
@@ -77,6 +78,43 @@ function toggleApp() {
   }
 }
 
+function createTray() {
+  // macOS requires an image for Tray, so we use a 1x1 transparent pixel
+  const emptyIcon = nativeImage.createFromBuffer(Buffer.from([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+    0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x08, 0xD7, 0x63, 0x60, 0x00, 0x02, 0x00,
+    0x00, 0x05, 0x00, 0x01, 0x0D, 0x26, 0xE5, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44,
+    0xAE, 0x42, 0x60, 0x82
+  ]));
+
+  tray = new Tray(emptyIcon);
+
+  if (process.platform === "darwin") {
+    tray.setTitle("AI");
+  } else {
+    tray.setToolTip(APP_NAME);
+  }
+
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Show/Hide App', click: () => toggleApp() },
+    { type: 'separator' },
+    {
+      label: 'Quit', click: () => {
+        isQuiting = true;
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.on('click', () => {
+    toggleApp();
+  });
+  tray.on('right-click', () => {
+    tray.popUpContextMenu(contextMenu);
+  });
+}
+
 const gotLock = app.requestSingleInstanceLock();
 
 if (!gotLock) {
@@ -105,9 +143,12 @@ app.whenReady().then(() => {
     createWindow();
   }
 
+  createTray();
+
   globalShortcut.register("Control+Space", () => {
     toggleApp();
   });
+
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
