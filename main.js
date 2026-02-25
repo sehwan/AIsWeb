@@ -55,15 +55,23 @@ function createWindow() {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+
+  mainWindow.once("ready-to-show", () => {
+    mainWindow.show();
+    mainWindow.focus();
+  });
 }
 
 function toggleApp() {
   if (mainWindow) {
-    if (mainWindow.isVisible()) {
+    if (mainWindow.isVisible() && mainWindow.isFocused()) {
       mainWindow.hide();
     } else {
       mainWindow.show();
       mainWindow.focus();
+      if (process.platform === "darwin") {
+        app.focus({ steal: true });
+      }
     }
   } else {
     createWindow();
@@ -72,8 +80,11 @@ function toggleApp() {
 
 function createTray() {
   const iconPath = path.join(__dirname, 'build', 'icon.png');
-  const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+  const icon = nativeImage.createFromPath(iconPath).resize({ width: 20, height: 20 });
   tray = new Tray(icon);
+  if (process.platform === "darwin") {
+    tray.setTitle(" AI"); // Text fallback in case icon fails to render
+  }
 
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show/Hide App', click: () => toggleApp() },
