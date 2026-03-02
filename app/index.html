@@ -172,6 +172,23 @@
       color: #bdbdbd;
       min-height: 16px;
     }
+
+    .open-ext {
+      padding: 2px 6px;
+      font-size: 12px;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      color: #e5e5e5;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .open-ext:hover {
+      background: #3a3a3a;
+    }
   </style>
 </head>
 
@@ -187,7 +204,7 @@
               <button id="newQuestionBtn">새 질문</button>
               <button id="retryBtn" style="display:none; background:#2a1a1a; color:#ef4444;">재시도</button>
             </div>
-            <div class="hint">Enter: 질문 / Ctrl+K: 새 질문</div>
+            <div class="hint">Enter: 질문 / Cmd+N: 새 질문</div>
             <div id="status"></div>
           </div>
         </div>
@@ -196,7 +213,10 @@
         <section class="panel ai">
           <div class="service-head">
             <h2>Perplexity</h2>
-            <span class="badge" data-badge="perplexity">대기</span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span class="badge" data-badge="perplexity">대기</span>
+              <button class="open-ext" data-url="https://www.perplexity.ai" title="브라우저에서 열기">↗</button>
+            </div>
           </div>
           <webview id="wv-perplexity" src="https://www.perplexity.ai" partition="persist:perplexity"></webview>
         </section>
@@ -204,7 +224,10 @@
         <section class="panel ai">
           <div class="service-head">
             <h2>Google Gemini</h2>
-            <span class="badge" data-badge="gemini">대기</span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span class="badge" data-badge="gemini">대기</span>
+              <button class="open-ext" data-url="https://gemini.google.com/app" title="브라우저에서 열기">↗</button>
+            </div>
           </div>
           <webview id="wv-gemini" src="https://gemini.google.com" partition="persist:gemini"></webview>
         </section>
@@ -212,7 +235,10 @@
         <section class="panel ai">
           <div class="service-head">
             <h2>Grok</h2>
-            <span class="badge" data-badge="grok">대기</span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span class="badge" data-badge="grok">대기</span>
+              <button class="open-ext" data-url="https://grok.com" title="브라우저에서 열기">↗</button>
+            </div>
           </div>
           <webview id="wv-grok" src="https://grok.com" partition="persist:grok"></webview>
         </section>
@@ -220,7 +246,10 @@
         <section class="panel ai">
           <div class="service-head">
             <h2>ChatGPT</h2>
-            <span class="badge" data-badge="chatgpt">대기</span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span class="badge" data-badge="chatgpt">대기</span>
+              <button class="open-ext" data-url="https://chatgpt.com" title="브라우저에서 열기">↗</button>
+            </div>
           </div>
           <webview id="wv-chatgpt" src="https://chatgpt.com" partition="persist:chatgpt"></webview>
         </section>

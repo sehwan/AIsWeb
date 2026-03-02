@@ -1,7 +1,7 @@
 const { app, BrowserWindow, shell, nativeImage, Tray, Menu, globalShortcut } = require("electron");
 const path = require("path");
 
-const APP_NAME = "AllAI";
+const APP_NAME = "AI";
 const APP_ID = "com.alchemists.allai";
 let mainWindow = null;
 let tray = null;
@@ -33,7 +33,8 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      webviewTag: true
+      webviewTag: true,
+      backgroundThrottling: false
     }
   });
 
@@ -64,9 +65,12 @@ function createWindow() {
 
 function toggleApp() {
   if (mainWindow) {
-    if (mainWindow.isVisible() && mainWindow.isFocused()) {
+    if (mainWindow.isVisible() && mainWindow.isFocused() && !mainWindow.isMinimized()) {
       mainWindow.hide();
     } else {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
       mainWindow.show();
       mainWindow.focus();
       if (process.platform === "darwin") {
@@ -78,17 +82,24 @@ function toggleApp() {
   }
 }
 
-function createTray() {
-  // macOS requires an image for Tray, so we use a 1x1 transparent pixel
-  const emptyIcon = nativeImage.createFromBuffer(Buffer.from([
-    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
-    0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x08, 0xD7, 0x63, 0x60, 0x00, 0x02, 0x00,
-    0x00, 0x05, 0x00, 0x01, 0x0D, 0x26, 0xE5, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44,
-    0xAE, 0x42, 0x60, 0x82
-  ]));
+function createTrayIcon() {
+  // A simple 22x22 monochrome SVG for the macOS Tray
+  // It will become a template image to automatically adapt to light/dark themes.
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
+  <rect x="2" y="2" width="18" height="18" rx="4" fill="#000000" />
+  <text x="11" y="15" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#ffffff">AI</text>
+</svg>`;
+  const base64 = Buffer.from(svg).toString("base64");
+  const img = nativeImage.createFromDataURL(`data:image/svg+xml;base64,${base64}`);
+  // Important for macOS Tray to support dark mode appropriately
+  img.setTemplateImage(true);
+  return img;
+}
 
-  tray = new Tray(emptyIcon);
+function createTray() {
+  const icon = createTrayIcon();
+  tray = new Tray(icon);
 
   if (process.platform === "darwin") {
     tray.setTitle("AI");
@@ -97,22 +108,19 @@ function createTray() {
   }
 
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Show/Hide App', click: () => toggleApp() },
+    { label: '창 열기 / 숨기기', click: () => toggleApp() },
     { type: 'separator' },
     {
-      label: 'Quit', click: () => {
+      label: '종료하기', click: () => {
         isQuiting = true;
         app.quit();
       }
     }
   ]);
 
-  tray.on('click', () => {
-    toggleApp();
-  });
-  tray.on('right-click', () => {
-    tray.popUpContextMenu(contextMenu);
-  });
+  if (tray) {
+    tray.setContextMenu(contextMenu);
+  }
 }
 
 const gotLock = app.requestSingleInstanceLock();
@@ -137,6 +145,20 @@ app.whenReady().then(() => {
   if (process.platform === "darwin") {
     app.dock.hide();
   }
+
+  // Stability & Optimization: Handle web process crashes and configure webviews safely
+  app.on("web-contents-created", (event, contents) => {
+    contents.on("will-attach-webview", (e, webPreferences, params) => {
+      // Allow background processing in webviews so AI can answer when hidden
+      webPreferences.backgroundThrottling = false;
+    });
+    contents.on("render-process-gone", (event, details) => {
+      console.error(`Render process gone (${details.reason}). Redeploying...`);
+      if (details.reason !== "clean-exit") {
+        contents.reload();
+      }
+    });
+  });
 
 
   if (!mainWindow) {

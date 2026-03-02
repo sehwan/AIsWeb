@@ -11,17 +11,17 @@ const retryBtn = document.getElementById("retryBtn");
 const statusEl = document.getElementById("status");
 
 const webviews = {
-  chatgpt: document.getElementById("wv-chatgpt"),
+  perplexity: document.getElementById("wv-perplexity"),
   gemini: document.getElementById("wv-gemini"),
   grok: document.getElementById("wv-grok"),
-  perplexity: document.getElementById("wv-perplexity"),
+  chatgpt: document.getElementById("wv-chatgpt"),
 };
 
 const NEW_CHAT_URLS = {
-  chatgpt: "https://chatgpt.com/",
+  perplexity: "https://www.perplexity.ai/",
   gemini: "https://gemini.google.com/app",
   grok: "https://grok.com/",
-  perplexity: "https://www.perplexity.ai/",
+  chatgpt: "https://chatgpt.com/",
 };
 
 let isBroadcasting = false;
@@ -512,7 +512,7 @@ questionInput.addEventListener("keydown", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "n") {
     e.preventDefault();
     resetQuestion();
   }
@@ -529,6 +529,14 @@ retryBtn?.addEventListener("click", () => {
     .filter(([, r]) => !r.submitOk)
     .map(([k]) => k);
   if (fails.length) broadcast(fails);
+});
+
+// External browser links
+document.querySelectorAll('.open-ext').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const url = btn.getAttribute('data-url');
+    if (url) window.open(url, '_blank');
+  });
 });
 
 questionInput.value = "";

@@ -9,6 +9,22 @@ npm install
 npm start
 ```
 
+## 빌드 (Build)
+
+macOS용 애플리케이션을 빌드하려면 다음 명령어를 실행하세요:
+
+```bash
+# Mac 빌드 (ARM64)
+npm run build:mac
+```
+
+빌드가 완료되면 `dist/mac-arm64/AI.app` 경로에 실행 파일이 생성됩니다.  
+애플리케이션 폴더로 복사하려면 다음 명령어를 사용할 수 있습니다:
+
+```bash
+cp -R dist/mac-arm64/AI.app /Applications/AI.app
+```
+
 ## 기능
 
 - 질문 입력 1개
