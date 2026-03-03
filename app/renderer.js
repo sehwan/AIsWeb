@@ -533,8 +533,22 @@ retryBtn?.addEventListener("click", () => {
 
 // External browser links
 document.querySelectorAll('.open-ext').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const url = btn.getAttribute('data-url');
+  btn.addEventListener('click', async () => {
+    const panel = btn.closest('.panel.ai');
+    const wv = panel ? panel.querySelector('webview') : null;
+    let url = btn.getAttribute('data-url');
+
+    if (wv) {
+      try {
+        const currentUrl = await wv.executeJavaScript("location.href");
+        if (currentUrl) url = currentUrl;
+      } catch (e) {
+        if (typeof wv.getURL === 'function') {
+          url = wv.getURL() || url;
+        }
+      }
+    }
+
     if (url) window.open(url, '_blank');
   });
 });
