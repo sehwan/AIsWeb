@@ -8,8 +8,8 @@ These rules must be followed by Antigravity whenever modifications are made to t
     After making any changes to the source code, you MUST run the build command to ensure the application is correctly packaged.
     - Command: `npm run build:mac`
 
-2.  **Deployment (Local)**:
-    Optionally, you can deploy to the Applications folder using:
+2.  **Deployment**:
+    After a successful build, you MUST copy the application to the macOS Applications folder.
     - Command: `cp -R dist/mac-arm64/AI.app /Applications/AI.app`
 
 3.  **Version Control**:
