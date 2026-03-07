@@ -216,20 +216,6 @@
 <body>
   <div class="wrap">
     <div class="layout">
-      <section class="panel">
-        <div class="input-row">
-          <textarea id="question" placeholder="질문을 입력하세요..."></textarea>
-          <div class="input-side">
-            <div class="row">
-              <button id="broadcastBtn">질문하기</button>
-              <button id="newQuestionBtn">새 질문</button>
-              <button id="retryBtn" style="display:none; background:#2a1a1a; color:#ef4444;">재시도</button>
-            </div>
-            <div class="hint">Enter: 질문 / Cmd+N: 새 질문</div>
-            <div id="status"></div>
-          </div>
-        </div>
-      </section>
       <div class="grid4">
         <section class="panel ai">
           <div class="service-head">
@@ -279,6 +265,20 @@
           <webview id="wv-chatgpt" src="https://chatgpt.com" partition="persist:chatgpt"></webview>
         </section>
       </div>
+      <section class="panel">
+        <div class="input-row">
+          <textarea id="question" placeholder="질문을 입력하세요..."></textarea>
+          <div class="input-side">
+            <div class="row">
+              <button id="broadcastBtn">질문하기</button>
+              <button id="newQuestionBtn">새 질문</button>
+              <button id="retryBtn" style="display:none; background:#2a1a1a; color:#ef4444;">재시도</button>
+            </div>
+            <div class="hint">Enter: 질문 / Cmd+N: 새 질문</div>
+            <div id="status"></div>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 
