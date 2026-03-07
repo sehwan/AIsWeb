@@ -367,11 +367,11 @@ async function injectOne(key, wv, prompt) {
     } catch {
       /* webview not ready */
     }
-    await wait(400 + i * 300);
+    await wait(200 + i * 200);
   }
   if (!focused) return { inputOk: false, submitOk: false };
 
-  await wait(150);
+  await wait(50);
 
   // ── Phase 2: Type text using Electron native insertText ──
   // This uses Chromium's InputMethod, generating trusted InputEvents.
@@ -387,7 +387,7 @@ async function injectOne(key, wv, prompt) {
   // We poll until the submit button becomes enabled, up to 3 seconds.
   let submitReady = false;
   for (let i = 0; i < 15; i++) {
-    await wait(200);
+    await wait(100);
     try {
       const c = await wv.executeJavaScript(CHECK_SUBMIT_READY_SCRIPT, true);
       if (c?.found && c?.enabled) {
@@ -478,7 +478,7 @@ async function broadcast(keys) {
       r.submitOk ? "ok" : r.inputOk ? "warn" : "fail"
     );
     setStatus(`전송 중... (${done}/${targets.length})`);
-    await wait(200);
+    await wait(50);
   }
 
   const total = Object.keys(webviews).length;
@@ -529,6 +529,18 @@ retryBtn?.addEventListener("click", () => {
     .filter(([, r]) => !r.submitOk)
     .map(([k]) => k);
   if (fails.length) broadcast(fails);
+});
+
+// Individual Refresh Buttons
+document.querySelectorAll(".refresh-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const key = btn.getAttribute("data-service");
+    const wv = webviews[key];
+    if (key && wv) {
+      setBadge(key, "새로고침");
+      openFreshConversation(key, wv);
+    }
+  });
 });
 
 // External browser links
