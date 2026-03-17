@@ -23,10 +23,13 @@
     },
     "mac": {
       "target": [
-        "dir"
+        "dmg"
       ],
       "category": "public.app-category.productivity",
       "icon": "build/icon.png"
+    },
+    "dmg": {
+      "title": "AI Installer"
     }
   },
   "devDependencies": {

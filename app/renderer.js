@@ -468,7 +468,16 @@ async function broadcast(keys) {
     setBadge(key, "전송 중", "sending");
     await waitForReady(wv, 5000);
 
-    const r = await injectOne(key, wv, prompt);
+    let r = await injectOne(key, wv, prompt);
+
+    // 자동 복구 로직: 전송 실패 시 해당 연결만 즉시 1회 새로고침 후 재시도
+    if (!r.submitOk) {
+      setBadge(key, "복구 중...", "warn");
+      setStatus(`${key} 연결 상태 이상. 자동 복구 중...`);
+      await openFreshConversation(key, wv);
+      r = await injectOne(key, wv, prompt);
+    }
+
     lastResults[key] = r;
     done++;
 
@@ -502,6 +511,17 @@ for (const [k, wv] of Object.entries(webviews)) {
   wv.addEventListener("did-start-loading", () => setBadge(k, "로딩 중"));
   wv.addEventListener("did-stop-loading", () => setBadge(k, "준비"));
   wv.addEventListener("did-fail-load", () => setBadge(k, "로드 실패", "fail"));
+  
+  wv.addEventListener("dom-ready", () => {
+    // Perplexity의 폰트가 마음에 들지 않는다는 피드백 반영 (가벼운 CSS 주입 방식 사용)
+    if (k === "perplexity") {
+      wv.insertCSS(`
+        * {
+          font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif !important;
+        }
+      `).catch(() => {});
+    }
+  });
 }
 
 questionInput.addEventListener("keydown", (e) => {
