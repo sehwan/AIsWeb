@@ -31,9 +31,7 @@ let lastPromptSent = "";
 // ─── Helpers ──────────────────────────────────────────────────
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const setStatus = (t) => {
-  statusEl.textContent = t;
-};
+const setStatus = (t) => { statusEl.textContent = t; };
 
 function setBadge(key, text, type) {
   const b = document.querySelector(`[data-badge='${key}']`);
@@ -47,96 +45,94 @@ function updateRetryBtn() {
   if (retryBtn) retryBtn.style.display = fails > 0 ? "" : "none";
 }
 
+// ─── Shared Script Helpers ────────────────────────────────────
+// Common utilities injected into webview scripts to avoid duplication.
+
+const SHARED_HELPERS = `
+  const vis = (e) => {
+    if (!e) return false;
+    const s = getComputedStyle(e);
+    return s.display !== 'none' && s.visibility !== 'hidden' && e.offsetParent !== null;
+  };
+  const isExcludedBtn = (btn) => {
+    const label = (btn.getAttribute('aria-label') || '').toLowerCase();
+    const testId = (btn.getAttribute('data-testid') || '').toLowerCase();
+    return label.includes('attach') || label.includes('add') || label.includes('file')
+        || label.includes('upload') || label.includes('focus')
+        || testId.includes('attach') || testId.includes('add')
+        || testId.includes('file') || testId.includes('upload');
+  };
+  const findPerplexitySubmit = () => {
+    const textarea = document.querySelector('textarea');
+    const container = textarea?.closest('form')
+      || textarea?.parentElement?.parentElement?.parentElement;
+    if (!container) return null;
+    const candidates = Array.from(container.querySelectorAll('button'))
+      .filter(btn => vis(btn) && !isExcludedBtn(btn));
+    return candidates.find(btn => {
+      const label = (btn.getAttribute('aria-label') || '').toLowerCase();
+      return label.includes('submit') || label.includes('send') || label.includes('ask')
+             || label.includes('search') || label.includes('go');
+    }) || candidates[candidates.length - 1] || null;
+  };
+`;
+
+// ─── New Chat Scripts ─────────────────────────────────────────
+
 function buildNewChatScript(serviceKey) {
   const serviceLiteral = JSON.stringify(serviceKey);
   return `(() => {
     const service = ${serviceLiteral};
     const textOf = (el) => (el?.textContent || '').trim().toLowerCase();
-
     const clickFirst = (selectors) => {
       for (const selector of selectors) {
         const element = document.querySelector(selector);
-        if (element && !element.disabled) {
-          element.click();
-          return true;
-        }
+        if (element && !element.disabled) { element.click(); return true; }
       }
       return false;
     };
 
     if (service === 'chatgpt') {
-      if (clickFirst([
-        'a[data-testid="new-chat-button"]',
-        'button[data-testid="new-chat-button"]',
-        'a[href="/"]'
-      ])) return true;
+      if (clickFirst(['a[data-testid="new-chat-button"]', 'button[data-testid="new-chat-button"]', 'a[href="/"]'])) return true;
       location.href = 'https://chatgpt.com/';
       return true;
     }
-
     if (service === 'gemini') {
-      if (clickFirst([
-        'button[aria-label*="New chat" i]',
-        'button[aria-label*="새 채팅" i]',
-        'a[href="/app"]'
-      ])) return true;
+      if (clickFirst(['button[aria-label*="New chat" i]', 'button[aria-label*="새 채팅" i]', 'a[href="/app"]'])) return true;
       location.href = 'https://gemini.google.com/app';
       return true;
     }
-
     if (service === 'claude') {
-      if (clickFirst([
-        'a[href="/new"]',
-        'button[aria-label*="new chat" i]'
-      ])) return true;
+      if (clickFirst(['a[href="/new"]', 'button[aria-label*="new chat" i]'])) return true;
       location.href = 'https://claude.ai/';
       return true;
     }
-
     if (service === 'perplexity') {
-      if (clickFirst([
-        'a[href="/"]',
-        'button[aria-label*="New" i]',
-        'button[aria-label*="새" i]'
-      ])) return true;
-
+      if (clickFirst(['a[href="/"]', 'button[aria-label*="New" i]', 'button[aria-label*="새" i]'])) return true;
       const buttons = Array.from(document.querySelectorAll('button')).filter((button) => {
         const label = (button.getAttribute('aria-label') || '').toLowerCase();
         const text = textOf(button);
         if (label.includes('attach') || text.includes('attach')) return false;
         return (label.includes('new') || text.includes('new') || text.includes('새')) && !button.disabled;
       });
-      if (buttons[0]) {
-        buttons[0].click();
-        return true;
-      }
+      if (buttons[0]) { buttons[0].click(); return true; }
       location.href = 'https://www.perplexity.ai/';
       return true;
     }
-
     return false;
   })();`;
 }
 
 async function openFreshConversation(key, webview) {
   if (!webview) return;
-
   const targetUrl = NEW_CHAT_URLS[key];
   if (targetUrl) {
-    try {
-      webview.loadURL(targetUrl);
-    } catch {
-      // ignore URL load failure and continue to script fallback
-    }
+    try { webview.loadURL(targetUrl); } catch { /* ignore */ }
   }
-
   await waitForReady(webview, 5000);
-
   try {
     await webview.executeJavaScript(buildNewChatScript(key), true);
-  } catch {
-    // site DOM may not be ready yet; fallback is already URL navigation above
-  }
+  } catch { /* site DOM may not be ready; fallback is URL navigation */ }
 }
 
 function resetQuestion() {
@@ -156,12 +152,7 @@ async function waitForReady(wv, ms = 5000) {
   if (!wv?.isLoading()) return true;
   return new Promise((res) => {
     let done = false;
-    const fin = (v) => {
-      if (done) return;
-      done = true;
-      clearTimeout(t);
-      res(v);
-    };
+    const fin = (v) => { if (done) return; done = true; clearTimeout(t); res(v); };
     const t = setTimeout(() => fin(false), ms);
     wv.addEventListener("did-stop-loading", () => fin(true), { once: true });
     wv.addEventListener("did-fail-load", () => fin(false), { once: true });
@@ -171,7 +162,6 @@ async function waitForReady(wv, ms = 5000) {
 // ─── Injection Scripts (run inside webview) ───────────────────
 
 // Finds the best input element, focuses it, and selects all existing content.
-// Returns { ok, ce (contenteditable?) } so caller knows what kind of input it is.
 const FOCUS_SCRIPT = `(() => {
   const h = location.hostname;
   let el = null;
@@ -202,10 +192,8 @@ const FOCUS_SCRIPT = `(() => {
   }
 
   if (!el) return { ok: false };
-
   el.focus();
 
-  // Select all existing content so insertText will replace it
   if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
     el.select();
   } else if (el.isContentEditable) {
@@ -220,58 +208,19 @@ const FOCUS_SCRIPT = `(() => {
 })()`;
 
 // Finds and clicks the best submit/send button.
-// Returns { ok } indicating whether a button was clicked.
 const SUBMIT_CLICK_SCRIPT = `(() => {
+  ${SHARED_HELPERS}
   const h = location.hostname;
-  const vis = (e) => {
-    if (!e) return false;
-    const s = getComputedStyle(e);
-    return s.display !== 'none' && s.visibility !== 'hidden' && e.offsetParent !== null;
-  };
-  const isPerplexity = h.includes('perplexity');
 
-  // ── Perplexity: very specific logic to avoid hitting the wrong button ──
-  if (isPerplexity) {
-    // Perplexity's submit button is an arrow SVG button inside the textarea container.
-    // It's usually the LAST visible, enabled button near the textarea.
-    // Exclude buttons that are file-attach, add, focus-selector, etc.
-    const textarea = document.querySelector('textarea');
-    if (textarea) {
-      // Walk up to the form or the closest container that holds the submit button
-      const form = textarea.closest('form');
-      const container = form || textarea.parentElement?.parentElement?.parentElement;
-      if (container) {
-        const buttons = Array.from(container.querySelectorAll('button'));
-        // Filter: visible, enabled, and NOT an attach/add button
-        const candidates = buttons.filter(btn => {
-          if (!vis(btn) || btn.disabled) return false;
-          const label = (btn.getAttribute('aria-label') || '').toLowerCase();
-          const testId = (btn.getAttribute('data-testid') || '').toLowerCase();
-          // Exclude known non-submit buttons
-          if (label.includes('attach') || label.includes('add') || label.includes('file')
-              || label.includes('upload') || label.includes('focus')
-              || testId.includes('attach') || testId.includes('add')
-              || testId.includes('file') || testId.includes('upload')) return false;
-          return true;
-        });
-        // Prefer button with submit-like label, else take the last candidate (closest to textarea end)
-        const submitBtn = candidates.find(btn => {
-          const label = (btn.getAttribute('aria-label') || '').toLowerCase();
-          return label.includes('submit') || label.includes('send') || label.includes('ask')
-                 || label.includes('search') || label.includes('go');
-        }) || candidates[candidates.length - 1];
-        if (submitBtn) {
-          submitBtn.click();
-          return { ok: true, method: 'perplexity-specific' };
-        }
-      }
-    }
+  // ── Perplexity: specific logic to avoid wrong button ──
+  if (h.includes('perplexity')) {
+    const btn = findPerplexitySubmit();
+    if (btn && !btn.disabled) { btn.click(); return { ok: true, method: 'perplexity-specific' }; }
     return { ok: false };
   }
 
   // ── Other services ──
   const sels = [];
-
   if (h.includes('chatgpt'))
     sels.push('button[data-testid="send-button"]', 'button[aria-label*="Send" i]');
   else if (h.includes('gemini'))
@@ -283,77 +232,41 @@ const SUBMIT_CLICK_SCRIPT = `(() => {
 
   for (const sel of sels) {
     const btn = document.querySelector(sel);
-    if (btn && vis(btn) && !btn.disabled) {
-      btn.click();
-      return { ok: true, method: 'btn:' + sel };
-    }
+    if (btn && vis(btn) && !btn.disabled) { btn.click(); return { ok: true, method: 'btn:' + sel }; }
   }
 
-  // Fallback: SVG icon button near the active input (NOT for Perplexity)
+  // Fallback: SVG icon button near the active input
   const ae = document.activeElement;
   const container = ae?.closest('form')
     || ae?.parentElement?.parentElement?.parentElement?.parentElement;
-  if (container && !h.includes('perplexity')) {
-    const btns = Array.from(container.querySelectorAll('button')).filter(btn => vis(btn) && !btn.disabled && btn.querySelector('svg'));
-    const candidates = btns.filter(btn => {
-      const lbl = (btn.getAttribute('aria-label') || '').toLowerCase();
-      const tid = (btn.getAttribute('data-testid') || '').toLowerCase();
-      if (lbl.includes('attach') || lbl.includes('add') || lbl.includes('upload') || lbl.includes('파일') || lbl.includes('추가')) return false;
-      if (tid.includes('attach') || tid.includes('add') || tid.includes('upload')) return false;
-      return true;
-    });
-    const target = candidates.find(b => {
+  if (container) {
+    const btns = Array.from(container.querySelectorAll('button'))
+      .filter(btn => vis(btn) && !btn.disabled && btn.querySelector('svg') && !isExcludedBtn(btn));
+    const target = btns.find(b => {
       const l = (b.getAttribute('aria-label') || '').toLowerCase();
       return l.includes('send') || l.includes('submit') || l.includes('전송') || l.includes('보내기');
-    }) || candidates[candidates.length - 1];
-    
-    if (target) {
-      target.click();
-      return { ok: true, method: 'svg-btn-filtered' };
-    }
+    }) || btns[btns.length - 1];
+    if (target) { target.click(); return { ok: true, method: 'svg-btn-filtered' }; }
   }
 
   return { ok: false };
 })()`;
 
-// Check if the submit button exists but is disabled (text not yet recognized)
+// Check if the submit button exists and is enabled.
 const CHECK_SUBMIT_READY_SCRIPT = `(() => {
+  ${SHARED_HELPERS}
   const h = location.hostname;
-  const vis = (e) => {
-    if (!e) return false;
-    const s = getComputedStyle(e);
-    return s.display !== 'none' && s.visibility !== 'hidden' && e.offsetParent !== null;
-  };
 
-  // Perplexity: find the correct submit button near the textarea
   if (h.includes('perplexity')) {
-    const textarea = document.querySelector('textarea');
-    const container = textarea?.closest('form')
-      || textarea?.parentElement?.parentElement?.parentElement;
-    if (container) {
-      const buttons = Array.from(container.querySelectorAll('button'));
-      const candidates = buttons.filter(btn => {
-        if (!vis(btn)) return false;
-        const label = (btn.getAttribute('aria-label') || '').toLowerCase();
-        const testId = (btn.getAttribute('data-testid') || '').toLowerCase();
-        if (label.includes('attach') || label.includes('add') || label.includes('file')
-            || label.includes('upload') || label.includes('focus')
-            || testId.includes('attach') || testId.includes('add')) return false;
-        return true;
-      });
-      const submitBtn = candidates.find(btn => {
-        const label = (btn.getAttribute('aria-label') || '').toLowerCase();
-        return label.includes('submit') || label.includes('send') || label.includes('ask');
-      }) || candidates[candidates.length - 1];
-      if (submitBtn) return { found: true, enabled: !submitBtn.disabled };
-    }
+    const btn = findPerplexitySubmit();
+    if (btn) return { found: true, enabled: !btn.disabled };
     return { found: false, enabled: false };
   }
 
   const sels = [];
-  if (h.includes('chatgpt'))    sels.push('button[data-testid="send-button"]');
-  if (h.includes('gemini'))    sels.push('button[aria-label*="Send message" i]', 'button.send-button');
-  if (h.includes('claude'))      sels.push('button[data-testid="send-button"]', 'button[aria-label*="Send Message" i]', 'button[aria-label*="send" i]');
+  if (h.includes('chatgpt'))  sels.push('button[data-testid="send-button"]');
+  if (h.includes('gemini'))   sels.push('button[aria-label*="Send message" i]', 'button.send-button');
+  if (h.includes('claude'))   sels.push('button[data-testid="send-button"]', 'button[aria-label*="Send Message" i]', 'button[aria-label*="send" i]');
   sels.push('button[type="submit"]');
 
   for (const sel of sels) {
@@ -371,13 +284,8 @@ async function injectOne(key, wv, prompt) {
   for (let i = 0; i < 6; i++) {
     try {
       const r = await wv.executeJavaScript(FOCUS_SCRIPT, true);
-      if (r?.ok) {
-        focused = true;
-        break;
-      }
-    } catch {
-      /* webview not ready */
-    }
+      if (r?.ok) { focused = true; break; }
+    } catch { /* webview not ready */ }
     await wait(200 + i * 200);
   }
   if (!focused) return { inputOk: false, submitOk: false };
@@ -385,84 +293,53 @@ async function injectOne(key, wv, prompt) {
   await wait(50);
 
   // ── Phase 2: Type text using Electron native insertText ──
-  // This uses Chromium's InputMethod, generating trusted InputEvents.
-  // Works with React, Lexical, ProseMirror, Quill, plain textareas—all of them.
-  try {
-    wv.insertText(prompt);
-  } catch {
-    return { inputOk: false, submitOk: false };
-  }
+  try { wv.insertText(prompt); } catch { return { inputOk: false, submitOk: false }; }
 
   // ── Phase 3: Wait for framework to recognize the input ──
-  // React, Lexical etc. need time to process InputEvents and enable submit button.
-  // We poll until the submit button becomes enabled, up to 3 seconds.
   let submitReady = false;
-  for (let i = 0; i < 15; i++) {
-    await wait(100);
+  for (let i = 0; i < 10; i++) {
+    await wait(150);
     try {
       const c = await wv.executeJavaScript(CHECK_SUBMIT_READY_SCRIPT, true);
-      if (c?.found && c?.enabled) {
-        submitReady = true;
-        break;
-      }
-    } catch {
-      /* ignore */
-    }
+      if (c?.found && c?.enabled) { submitReady = true; break; }
+    } catch { /* ignore */ }
   }
-
-  // Even if poll didn't find an enabled button, still try to submit
-  // (some services don't have a dedicated button; Enter key works)
 
   // ── Phase 4: Submit – click button first ──
   let submitted = false;
   for (let i = 0; i < 3; i++) {
     try {
       const r = await wv.executeJavaScript(SUBMIT_CLICK_SCRIPT, true);
-      if (r?.ok) {
-        submitted = true;
-        break;
-      }
-    } catch {
-      /* ignore */
-    }
+      if (r?.ok) { submitted = true; break; }
+    } catch { /* ignore */ }
     await wait(300);
   }
 
   // ── Phase 5: Fallback – send native Enter keystroke ──
-  // sendInputEvent generates a trusted KeyboardEvent (isTrusted: true)
-  // which React/frameworks properly handle, unlike JS-dispatched events.
   if (!submitted) {
     try {
-      // Re-focus input first
       await wv.executeJavaScript(FOCUS_SCRIPT, true);
       await wait(100);
       wv.sendInputEvent({ type: "keyDown", keyCode: "Return" });
       await wait(30);
       wv.sendInputEvent({ type: "keyUp", keyCode: "Return" });
       submitted = true;
-    } catch {
-      submitted = false;
-    }
+    } catch { submitted = false; }
   }
 
   return { inputOk: true, submitOk: submitted };
 }
 
-// ─── Broadcast ────────────────────────────────────────────────
+// ─── Broadcast (parallel) ─────────────────────────────────────
 
 async function broadcast(keys) {
   if (isBroadcasting) return;
 
   const typedPrompt = questionInput.value.trim();
   const prompt = typedPrompt || (keys ? lastPromptSent : "");
-  if (!prompt) {
-    setStatus("질문을 먼저 입력해 주세요.");
-    return;
-  }
+  if (!prompt) { setStatus("질문을 먼저 입력해 주세요."); return; }
 
-  if (!keys) {
-    lastPromptSent = prompt;
-  }
+  if (!keys) lastPromptSent = prompt;
 
   isBroadcasting = true;
   broadcastBtn.disabled = true;
@@ -472,19 +349,19 @@ async function broadcast(keys) {
     ? keys.map((k) => [k, webviews[k]])
     : Object.entries(webviews);
 
-  let done = 0;
   setStatus(`전송 중... (0/${targets.length})`);
+  let done = 0;
 
-  for (const [key, wv] of targets) {
+  // ── Parallel injection ──
+  const jobs = targets.map(async ([key, wv]) => {
     setBadge(key, "전송 중", "sending");
     await waitForReady(wv, 5000);
 
     let r = await injectOne(key, wv, prompt);
 
-    // 자동 복구 로직: 전송 실패 시 해당 연결만 즉시 1회 새로고침 후 재시도
+    // 자동 복구: 전송 실패 시 해당 연결만 1회 새로고침 후 재시도
     if (!r.submitOk) {
       setBadge(key, "복구 중...", "warn");
-      setStatus(`${key} 연결 상태 이상. 자동 복구 중...`);
       await openFreshConversation(key, wv);
       r = await injectOne(key, wv, prompt);
     }
@@ -498,8 +375,9 @@ async function broadcast(keys) {
       r.submitOk ? "ok" : r.inputOk ? "warn" : "fail"
     );
     setStatus(`전송 중... (${done}/${targets.length})`);
-    await wait(50);
-  }
+  });
+
+  await Promise.all(jobs);
 
   const total = Object.keys(webviews).length;
   const ok = Object.values(lastResults).filter((r) => r.submitOk).length;
@@ -522,9 +400,8 @@ for (const [k, wv] of Object.entries(webviews)) {
   wv.addEventListener("did-start-loading", () => setBadge(k, "로딩 중"));
   wv.addEventListener("did-stop-loading", () => setBadge(k, "준비"));
   wv.addEventListener("did-fail-load", () => setBadge(k, "로드 실패", "fail"));
-  
+
   wv.addEventListener("dom-ready", () => {
-    // Perplexity의 폰트가 마음에 들지 않는다는 피드백 반영 (가벼운 CSS 주입 방식 사용)
     if (k === "perplexity") {
       wv.insertCSS(`
         * {
@@ -536,29 +413,18 @@ for (const [k, wv] of Object.entries(webviews)) {
 }
 
 questionInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    broadcast();
-  }
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); broadcast(); }
 });
 
 document.addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "n") {
-    e.preventDefault();
-    resetQuestion();
-  }
-  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-    e.preventDefault();
-    broadcast();
-  }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "n") { e.preventDefault(); resetQuestion(); }
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); broadcast(); }
 });
 
 broadcastBtn.addEventListener("click", () => broadcast());
 newQuestionBtn.addEventListener("click", resetQuestion);
 retryBtn?.addEventListener("click", () => {
-  const fails = Object.entries(lastResults)
-    .filter(([, r]) => !r.submitOk)
-    .map(([k]) => k);
+  const fails = Object.entries(lastResults).filter(([, r]) => !r.submitOk).map(([k]) => k);
   if (fails.length) broadcast(fails);
 });
 
@@ -567,10 +433,7 @@ document.querySelectorAll(".refresh-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     const key = btn.getAttribute("data-service");
     const wv = webviews[key];
-    if (key && wv) {
-      setBadge(key, "새로고침");
-      openFreshConversation(key, wv);
-    }
+    if (key && wv) { setBadge(key, "새로고침"); openFreshConversation(key, wv); }
   });
 });
 
@@ -580,18 +443,14 @@ document.querySelectorAll('.open-ext').forEach(btn => {
     const panel = btn.closest('.panel.ai');
     const wv = panel ? panel.querySelector('webview') : null;
     let url = btn.getAttribute('data-url');
-
     if (wv) {
       try {
         const currentUrl = await wv.executeJavaScript("location.href");
         if (currentUrl) url = currentUrl;
       } catch (e) {
-        if (typeof wv.getURL === 'function') {
-          url = wv.getURL() || url;
-        }
+        if (typeof wv.getURL === 'function') url = wv.getURL() || url;
       }
     }
-
     if (url) window.open(url, '_blank');
   });
 });

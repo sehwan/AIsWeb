@@ -160,7 +160,6 @@ app.whenReady().then(() => {
     });
   });
 
-
   if (!mainWindow) {
     createWindow();
   }
@@ -170,7 +169,6 @@ app.whenReady().then(() => {
   globalShortcut.register("Control+Space", () => {
     toggleApp();
   });
-
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

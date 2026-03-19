@@ -110,3 +110,8 @@ dist-linux/
 build/
 *.dmg
 *.app
+
+# AI Agent configuration (internal)
+.agents/
+antigravity-instructions.md
+.gemini/
