@@ -13,14 +13,14 @@ const statusEl = document.getElementById("status");
 const webviews = {
   perplexity: document.getElementById("wv-perplexity"),
   gemini: document.getElementById("wv-gemini"),
-  grok: document.getElementById("wv-grok"),
+  claude: document.getElementById("wv-claude"),
   chatgpt: document.getElementById("wv-chatgpt"),
 };
 
 const NEW_CHAT_URLS = {
   perplexity: "https://www.perplexity.ai/",
   gemini: "https://gemini.google.com/app",
-  grok: "https://grok.com/",
+  claude: "https://claude.ai/",
   chatgpt: "https://chatgpt.com/",
 };
 
@@ -84,12 +84,12 @@ function buildNewChatScript(serviceKey) {
       return true;
     }
 
-    if (service === 'grok') {
+    if (service === 'claude') {
       if (clickFirst([
-        'button[aria-label*="New" i]',
-        'a[href="/"]'
+        'a[href="/new"]',
+        'button[aria-label*="new chat" i]'
       ])) return true;
-      location.href = 'https://grok.com/';
+      location.href = 'https://claude.ai/';
       return true;
     }
 
@@ -189,9 +189,9 @@ const FOCUS_SCRIPT = `(() => {
     }
     if (!el) el = document.querySelector('[contenteditable="true"][role="textbox"]')
       || document.querySelector('textarea');
-  } else if (h.includes('grok') || h.includes('x.ai')) {
-    el = document.querySelector('textarea')
-      || document.querySelector('[contenteditable="true"]');
+  } else if (h.includes('claude')) {
+    el = document.querySelector('div[contenteditable="true"]')
+      || document.querySelector('textarea');
   } else if (h.includes('perplexity')) {
     el = document.querySelector('textarea[placeholder]')
       || document.querySelector('textarea')
@@ -276,8 +276,8 @@ const SUBMIT_CLICK_SCRIPT = `(() => {
     sels.push('button[data-testid="send-button"]', 'button[aria-label*="Send" i]');
   else if (h.includes('gemini'))
     sels.push('button[aria-label*="Send message" i]', 'button.send-button', 'button[aria-label*="Send" i]');
-  else if (h.includes('grok') || h.includes('x.ai'))
-    sels.push('button[aria-label*="Send" i]', 'button[data-testid*="send" i]');
+  else if (h.includes('claude'))
+    sels.push('button[aria-label*="Send Message" i]', 'button[aria-label*="send" i]');
 
   sels.push('button[type="submit"]', 'button[aria-label*="Submit" i]', 'button[aria-label*="Send" i]');
 
@@ -342,7 +342,7 @@ const CHECK_SUBMIT_READY_SCRIPT = `(() => {
   const sels = [];
   if (h.includes('chatgpt'))    sels.push('button[data-testid="send-button"]');
   if (h.includes('gemini'))    sels.push('button[aria-label*="Send message" i]', 'button.send-button');
-  if (h.includes('grok'))      sels.push('button[aria-label*="Send" i]');
+  if (h.includes('claude'))      sels.push('button[aria-label*="Send Message" i]', 'button[aria-label*="send" i]');
   sels.push('button[type="submit"]');
 
   for (const sel of sels) {

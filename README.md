@@ -1,6 +1,6 @@
 # AI Multi WebView (Electron MVP)
 
-입력창 1개와 `WebView` 4개(ChatGPT, Gemini, Grok, Perplexity)를 제공하는 데스크톱 앱입니다.
+입력창 1개와 `WebView` 4개(ChatGPT, Gemini, Claude, Perplexity)를 제공하는 데스크톱 앱입니다.
 
 ## 실행
 
