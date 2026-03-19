@@ -277,7 +277,7 @@ const SUBMIT_CLICK_SCRIPT = `(() => {
   else if (h.includes('gemini'))
     sels.push('button[aria-label*="Send message" i]', 'button.send-button', 'button[aria-label*="Send" i]');
   else if (h.includes('claude'))
-    sels.push('button[aria-label*="Send Message" i]', 'button[aria-label*="send" i]');
+    sels.push('button[data-testid="send-button"]', 'button[aria-label*="Send Message" i]', 'button[aria-label*="send" i]');
 
   sels.push('button[type="submit"]', 'button[aria-label*="Submit" i]', 'button[aria-label*="Send" i]');
 
@@ -342,7 +342,7 @@ const CHECK_SUBMIT_READY_SCRIPT = `(() => {
   const sels = [];
   if (h.includes('chatgpt'))    sels.push('button[data-testid="send-button"]');
   if (h.includes('gemini'))    sels.push('button[aria-label*="Send message" i]', 'button.send-button');
-  if (h.includes('claude'))      sels.push('button[aria-label*="Send Message" i]', 'button[aria-label*="send" i]');
+  if (h.includes('claude'))      sels.push('button[data-testid="send-button"]', 'button[aria-label*="Send Message" i]', 'button[aria-label*="send" i]');
   sels.push('button[type="submit"]');
 
   for (const sel of sels) {
