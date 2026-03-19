@@ -293,12 +293,23 @@ const SUBMIT_CLICK_SCRIPT = `(() => {
   const ae = document.activeElement;
   const container = ae?.closest('form')
     || ae?.parentElement?.parentElement?.parentElement?.parentElement;
-  if (container) {
-    for (const btn of container.querySelectorAll('button')) {
-      if (vis(btn) && !btn.disabled && btn.querySelector('svg')) {
-        btn.click();
-        return { ok: true, method: 'svg-btn' };
-      }
+  if (container && !h.includes('perplexity')) {
+    const btns = Array.from(container.querySelectorAll('button')).filter(btn => vis(btn) && !btn.disabled && btn.querySelector('svg'));
+    const candidates = btns.filter(btn => {
+      const lbl = (btn.getAttribute('aria-label') || '').toLowerCase();
+      const tid = (btn.getAttribute('data-testid') || '').toLowerCase();
+      if (lbl.includes('attach') || lbl.includes('add') || lbl.includes('upload') || lbl.includes('파일') || lbl.includes('추가')) return false;
+      if (tid.includes('attach') || tid.includes('add') || tid.includes('upload')) return false;
+      return true;
+    });
+    const target = candidates.find(b => {
+      const l = (b.getAttribute('aria-label') || '').toLowerCase();
+      return l.includes('send') || l.includes('submit') || l.includes('전송') || l.includes('보내기');
+    }) || candidates[candidates.length - 1];
+    
+    if (target) {
+      target.click();
+      return { ok: true, method: 'svg-btn-filtered' };
     }
   }
 
