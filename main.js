@@ -34,7 +34,8 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true,
-      backgroundThrottling: false
+      backgroundThrottling: false,
+      spellcheck: false
     }
   });
 
