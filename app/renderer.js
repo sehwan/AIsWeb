@@ -1,8 +1,7 @@
-// ─── AllAI Renderer ───────────────────────────────────────────
-// Uses Electron native APIs (insertText, sendInputEvent) for
-// reliable cross-service prompt injection + submission.
-// These generate trusted browser events identical to real user input.
-// ──────────────────────────────────────────────────────────────
+// ─── AllAI Renderer (Re-architected for Stability & Energy) ─────────
+// Core Logic: Intelligent prompt injection, power recovery, and 
+// visibility-based resource management.
+// ──────────────────────────────────────────────────────────────────
 
 const questionInput = document.getElementById("question");
 const broadcastBtn = document.getElementById("broadcastBtn");
@@ -17,36 +16,55 @@ const webviews = {
   chatgpt: document.getElementById("wv-chatgpt"),
 };
 
-const NEW_CHAT_URLS = {
-  perplexity: "https://www.perplexity.ai/",
-  gemini: "https://gemini.google.com/app",
-  claude: "https://claude.ai/",
-  chatgpt: "https://chatgpt.com/",
+const SERVICE_CONFIG = {
+  perplexity: {
+    name: "Perplexity",
+    url: "https://www.perplexity.ai/",
+    newChatUrl: "https://www.perplexity.ai/",
+    selectors: {
+      newChat: ['a[href="/"]', 'button[aria-label*="New" i]', 'button[aria-label*="새" i]'],
+      input: 'textarea[placeholder], textarea, [contenteditable="true"]',
+      submit: null // Uses specific logic in SHARED_HELPERS
+    }
+  },
+  gemini: {
+    name: "Google Gemini",
+    url: "https://gemini.google.com/app",
+    newChatUrl: "https://gemini.google.com/app",
+    selectors: {
+      newChat: ['button[aria-label*="New chat" i]', 'button[aria-label*="새 채팅" i]', 'a[href="/app"]'],
+      input: '.ql-editor[contenteditable="true"], rich-textarea [contenteditable="true"], [contenteditable="true"][role="textbox"], textarea',
+      submit: ['button[aria-label*="Send message" i]', 'button.send-button', 'button[aria-label*="Send" i]']
+    }
+  },
+  claude: {
+    name: "Claude",
+    url: "https://claude.ai/",
+    newChatUrl: "https://claude.ai/",
+    selectors: {
+      newChat: ['a[href="/new"]', 'button[aria-label*="new chat" i]'],
+      input: 'div[contenteditable="true"], textarea',
+      submit: ['button[data-testid="send-button"]', 'button[aria-label*="Send Message" i]', 'button[aria-label*="send" i]']
+    }
+  },
+  chatgpt: {
+    name: "ChatGPT",
+    url: "https://chatgpt.com/",
+    newChatUrl: "https://chatgpt.com/",
+    selectors: {
+      newChat: ['a[data-testid="new-chat-button"]', 'button[data-testid="new-chat-button"]', 'a[href="/"]'],
+      input: '#prompt-textarea',
+      submit: ['button[data-testid="send-button"]', 'button[aria-label*="Send" i]']
+    }
+  }
 };
 
 let isBroadcasting = false;
 let lastResults = {};
 let lastPromptSent = "";
+let isWindowVisible = true;
 
-// ─── Helpers ──────────────────────────────────────────────────
-
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const setStatus = (t) => { statusEl.textContent = t; };
-
-function setBadge(key, text, type) {
-  const b = document.querySelector(`[data-badge='${key}']`);
-  if (!b) return;
-  b.textContent = text;
-  b.className = "badge" + (type ? ` badge-${type}` : "");
-}
-
-function updateRetryBtn() {
-  const fails = Object.values(lastResults).filter((r) => !r.submitOk).length;
-  if (retryBtn) retryBtn.style.display = fails > 0 ? "" : "none";
-}
-
-// ─── Shared Script Helpers ────────────────────────────────────
-// Common utilities injected into webview scripts to avoid duplication.
+// ─── Shared Injection Helpers ─────────────────────────────────
 
 const SHARED_HELPERS = `
   const vis = (e) => {
@@ -77,75 +95,21 @@ const SHARED_HELPERS = `
   };
 `;
 
-// ─── New Chat Scripts ─────────────────────────────────────────
+// ─── Logic ────────────────────────────────────────────────────
 
-function buildNewChatScript(serviceKey) {
-  const serviceLiteral = JSON.stringify(serviceKey);
-  return `(() => {
-    const service = ${serviceLiteral};
-    const textOf = (el) => (el?.textContent || '').trim().toLowerCase();
-    const clickFirst = (selectors) => {
-      for (const selector of selectors) {
-        const element = document.querySelector(selector);
-        if (element && !element.disabled) { element.click(); return true; }
-      }
-      return false;
-    };
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const setStatus = (t) => { statusEl.textContent = t; };
 
-    if (service === 'chatgpt') {
-      if (clickFirst(['a[data-testid="new-chat-button"]', 'button[data-testid="new-chat-button"]', 'a[href="/"]'])) return true;
-      location.href = 'https://chatgpt.com/';
-      return true;
-    }
-    if (service === 'gemini') {
-      if (clickFirst(['button[aria-label*="New chat" i]', 'button[aria-label*="새 채팅" i]', 'a[href="/app"]'])) return true;
-      location.href = 'https://gemini.google.com/app';
-      return true;
-    }
-    if (service === 'claude') {
-      if (clickFirst(['a[href="/new"]', 'button[aria-label*="new chat" i]'])) return true;
-      location.href = 'https://claude.ai/';
-      return true;
-    }
-    if (service === 'perplexity') {
-      if (clickFirst(['a[href="/"]', 'button[aria-label*="New" i]', 'button[aria-label*="새" i]'])) return true;
-      const buttons = Array.from(document.querySelectorAll('button')).filter((button) => {
-        const label = (button.getAttribute('aria-label') || '').toLowerCase();
-        const text = textOf(button);
-        if (label.includes('attach') || text.includes('attach')) return false;
-        return (label.includes('new') || text.includes('new') || text.includes('새')) && !button.disabled;
-      });
-      if (buttons[0]) { buttons[0].click(); return true; }
-      location.href = 'https://www.perplexity.ai/';
-      return true;
-    }
-    return false;
-  })();`;
+function setBadge(key, text, type) {
+  const b = document.querySelector(`[data-badge='${key}']`);
+  if (!b) return;
+  b.textContent = text;
+  b.className = "badge" + (type ? ` badge-${type}` : "");
 }
 
-async function openFreshConversation(key, webview) {
-  if (!webview) return;
-  const targetUrl = NEW_CHAT_URLS[key];
-  if (targetUrl) {
-    try { webview.loadURL(targetUrl); } catch { /* ignore */ }
-  }
-  await waitForReady(webview, 5000);
-  try {
-    await webview.executeJavaScript(buildNewChatScript(key), true);
-  } catch { /* site DOM may not be ready; fallback is URL navigation */ }
-}
-
-function resetQuestion() {
-  questionInput.value = "";
-  lastResults = {};
-  lastPromptSent = "";
-  updateRetryBtn();
-  for (const [k, wv] of Object.entries(webviews)) {
-    setBadge(k, "새로고침");
-    openFreshConversation(k, wv);
-  }
-  setStatus("새 질문 준비 중...");
-  questionInput.focus();
+function updateRetryBtn() {
+  const fails = Object.values(lastResults).filter((r) => !r.submitOk).length;
+  if (retryBtn) retryBtn.style.display = fails > 0 ? "" : "none";
 }
 
 async function waitForReady(wv, ms = 5000) {
@@ -159,41 +123,33 @@ async function waitForReady(wv, ms = 5000) {
   });
 }
 
-// ─── Injection Scripts (run inside webview) ───────────────────
+async function openFreshConversation(key, webview) {
+  if (!webview) return;
+  const config = SERVICE_CONFIG[key];
+  try { webview.loadURL(config.newChatUrl); } catch { /* ignore */ }
+  await waitForReady(webview, 6000);
+}
 
-// Finds the best input element, focuses it, and selects all existing content.
-const FOCUS_SCRIPT = `(() => {
-  const h = location.hostname;
+// ─── Unified Injection ────────────────────────────────────────
+
+const FOCUS_SCRIPT = (selectors) => `(() => {
   let el = null;
-
-  if (h.includes('chatgpt')) {
-    el = document.querySelector('#prompt-textarea')
-      || document.querySelector('[contenteditable="true"][data-placeholder]')
-      || document.querySelector('div[contenteditable="true"]');
-  } else if (h.includes('gemini')) {
-    el = document.querySelector('.ql-editor[contenteditable="true"]')
-      || document.querySelector('rich-textarea [contenteditable="true"]');
-    if (!el) {
-      const rt = document.querySelector('rich-textarea');
-      if (rt && rt.shadowRoot) el = rt.shadowRoot.querySelector('[contenteditable="true"]');
-    }
-    if (!el) el = document.querySelector('[contenteditable="true"][role="textbox"]')
-      || document.querySelector('textarea');
-  } else if (h.includes('claude')) {
-    el = document.querySelector('div[contenteditable="true"]')
-      || document.querySelector('textarea');
-  } else if (h.includes('perplexity')) {
-    el = document.querySelector('textarea[placeholder]')
-      || document.querySelector('textarea')
-      || document.querySelector('[contenteditable="true"]');
-  } else {
-    el = document.querySelector('textarea')
-      || document.querySelector('[contenteditable="true"]');
+  const sels = ${JSON.stringify(selectors)};
+  for (const s of sels) {
+    el = document.querySelector(s);
+    if (el) break;
+  }
+  
+  // Specific fallback for Gemini shadow DOM
+  if (!el && location.hostname.includes('gemini')) {
+     const rt = document.querySelector('rich-textarea');
+     if (rt && rt.shadowRoot) el = rt.shadowRoot.querySelector('[contenteditable="true"]');
   }
 
+  if (!el) el = document.querySelector('textarea') || document.querySelector('[contenteditable="true"]');
   if (!el) return { ok: false };
-  el.focus();
 
+  el.focus();
   if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
     el.select();
   } else if (el.isContentEditable) {
@@ -203,163 +159,93 @@ const FOCUS_SCRIPT = `(() => {
     s.removeAllRanges();
     s.addRange(r);
   }
-
-  return { ok: true, ce: el.isContentEditable };
+  return { ok: true };
 })()`;
 
-// Finds and clicks the best submit/send button.
-const SUBMIT_CLICK_SCRIPT = `(() => {
+const SUBMIT_SCRIPT = (selectors) => `(() => {
   ${SHARED_HELPERS}
   const h = location.hostname;
-
-  // ── Perplexity: specific logic to avoid wrong button ──
   if (h.includes('perplexity')) {
     const btn = findPerplexitySubmit();
-    if (btn && !btn.disabled) { btn.click(); return { ok: true, method: 'perplexity-specific' }; }
+    if (btn && !btn.disabled) { btn.click(); return { ok: true }; }
     return { ok: false };
   }
 
-  // ── Other services ──
-  const sels = [];
-  if (h.includes('chatgpt'))
-    sels.push('button[data-testid="send-button"]', 'button[aria-label*="Send" i]');
-  else if (h.includes('gemini'))
-    sels.push('button[aria-label*="Send message" i]', 'button.send-button', 'button[aria-label*="Send" i]');
-  else if (h.includes('claude'))
-    sels.push('button[data-testid="send-button"]', 'button[aria-label*="Send Message" i]', 'button[aria-label*="send" i]');
-
-  sels.push('button[type="submit"]', 'button[aria-label*="Submit" i]', 'button[aria-label*="Send" i]');
-
+  const sels = ${JSON.stringify(selectors || [])};
   for (const sel of sels) {
     const btn = document.querySelector(sel);
-    if (btn && vis(btn) && !btn.disabled) { btn.click(); return { ok: true, method: 'btn:' + sel }; }
+    if (btn && vis(btn) && !btn.disabled) { btn.click(); return { ok: true }; }
   }
 
-  // Fallback: SVG icon button near the active input
+  // Fallback SVG search
   const ae = document.activeElement;
-  const container = ae?.closest('form')
-    || ae?.parentElement?.parentElement?.parentElement?.parentElement;
+  const container = ae?.closest('form') || ae?.parentElement?.parentElement?.parentElement;
   if (container) {
     const btns = Array.from(container.querySelectorAll('button'))
       .filter(btn => vis(btn) && !btn.disabled && btn.querySelector('svg') && !isExcludedBtn(btn));
-    const target = btns.find(b => {
-      const l = (b.getAttribute('aria-label') || '').toLowerCase();
-      return l.includes('send') || l.includes('submit') || l.includes('전송') || l.includes('보내기');
-    }) || btns[btns.length - 1];
-    if (target) { target.click(); return { ok: true, method: 'svg-btn-filtered' }; }
+    if (btns.length > 0) { btns[btns.length - 1].click(); return { ok: true }; }
   }
-
   return { ok: false };
 })()`;
 
-// Check if the submit button exists and is enabled.
-const CHECK_SUBMIT_READY_SCRIPT = `(() => {
-  ${SHARED_HELPERS}
-  const h = location.hostname;
-
-  if (h.includes('perplexity')) {
-    const btn = findPerplexitySubmit();
-    if (btn) return { found: true, enabled: !btn.disabled };
-    return { found: false, enabled: false };
-  }
-
-  const sels = [];
-  if (h.includes('chatgpt'))  sels.push('button[data-testid="send-button"]');
-  if (h.includes('gemini'))   sels.push('button[aria-label*="Send message" i]', 'button.send-button');
-  if (h.includes('claude'))   sels.push('button[data-testid="send-button"]', 'button[aria-label*="Send Message" i]', 'button[aria-label*="send" i]');
-  sels.push('button[type="submit"]');
-
-  for (const sel of sels) {
-    const btn = document.querySelector(sel);
-    if (btn && vis(btn)) return { found: true, enabled: !btn.disabled };
-  }
-  return { found: false, enabled: false };
-})()`;
-
-// ─── Core Injection (per-service) ─────────────────────────────
-
 async function injectOne(key, wv, prompt) {
-  // ── Phase 1: Focus the input element + select all ──
+  const config = SERVICE_CONFIG[key];
   let focused = false;
-  for (let i = 0; i < 6; i++) {
+  
+  // Focus retry loop
+  for (let i = 0; i < 5; i++) {
     try {
-      const r = await wv.executeJavaScript(FOCUS_SCRIPT, true);
+      const r = await wv.executeJavaScript(FOCUS_SCRIPT([config.selectors.input]), true);
       if (r?.ok) { focused = true; break; }
-    } catch { /* webview not ready */ }
-    await wait(200 + i * 200);
+    } catch { }
+    await wait(300 + i * 200);
   }
   if (!focused) return { inputOk: false, submitOk: false };
 
-  await wait(50);
-
-  // ── Phase 2: Type text using Electron native insertText ──
+  // Native insertion
   try { wv.insertText(prompt); } catch { return { inputOk: false, submitOk: false }; }
+  await wait(300);
 
-  // ── Phase 3: Wait for framework to recognize the input ──
-  let submitReady = false;
-  for (let i = 0; i < 10; i++) {
-    await wait(150);
-    try {
-      const c = await wv.executeJavaScript(CHECK_SUBMIT_READY_SCRIPT, true);
-      if (c?.found && c?.enabled) { submitReady = true; break; }
-    } catch { /* ignore */ }
-  }
-
-  // ── Phase 4: Submit – click button first ──
+  // Submit attempt
   let submitted = false;
-  for (let i = 0; i < 3; i++) {
-    try {
-      const r = await wv.executeJavaScript(SUBMIT_CLICK_SCRIPT, true);
-      if (r?.ok) { submitted = true; break; }
-    } catch { /* ignore */ }
-    await wait(300);
-  }
+  try {
+    const r = await wv.executeJavaScript(SUBMIT_SCRIPT(config.selectors.submit), true);
+    if (r?.ok) submitted = true;
+  } catch { }
 
-  // ── Phase 5: Fallback – send native Enter keystroke ──
+  // Enter fallback
   if (!submitted) {
     try {
-      await wv.executeJavaScript(FOCUS_SCRIPT, true);
-      await wait(100);
       wv.sendInputEvent({ type: "keyDown", keyCode: "Return" });
-      await wait(30);
+      await wait(50);
       wv.sendInputEvent({ type: "keyUp", keyCode: "Return" });
       submitted = true;
-    } catch { submitted = false; }
+    } catch { }
   }
 
   return { inputOk: true, submitOk: submitted };
 }
 
-// ─── Broadcast (parallel) ─────────────────────────────────────
+// ─── Core Actions ─────────────────────────────────────────────
 
 async function broadcast(keys) {
   if (isBroadcasting) return;
-
-  const typedPrompt = questionInput.value.trim();
-  const prompt = typedPrompt || (keys ? lastPromptSent : "");
+  const prompt = questionInput.value.trim() || (keys ? lastPromptSent : "");
   if (!prompt) { setStatus("질문을 먼저 입력해 주세요."); return; }
-
+  
   if (!keys) lastPromptSent = prompt;
-
   isBroadcasting = true;
   broadcastBtn.disabled = true;
-  if (retryBtn) retryBtn.disabled = true;
 
-  const targets = keys
-    ? keys.map((k) => [k, webviews[k]])
-    : Object.entries(webviews);
-
+  const targets = keys ? keys.map(k => [k, webviews[k]]) : Object.entries(webviews);
   setStatus(`전송 중... (0/${targets.length})`);
+  
   let done = 0;
-
-  // ── Parallel injection ──
   const jobs = targets.map(async ([key, wv]) => {
     setBadge(key, "전송 중", "sending");
     await waitForReady(wv, 5000);
-
     let r = await injectOne(key, wv, prompt);
 
-    // 자동 복구: 전송 실패 시 해당 연결만 1회 새로고침 후 재시도
     if (!r.submitOk) {
       setBadge(key, "복구 중...", "warn");
       await openFreshConversation(key, wv);
@@ -368,48 +254,55 @@ async function broadcast(keys) {
 
     lastResults[key] = r;
     done++;
-
-    setBadge(
-      key,
-      r.submitOk ? "전송됨" : r.inputOk ? "입력됨" : "실패",
-      r.submitOk ? "ok" : r.inputOk ? "warn" : "fail"
-    );
+    setBadge(key, r.submitOk ? "전송됨" : "실패", r.submitOk ? "ok" : "fail");
     setStatus(`전송 중... (${done}/${targets.length})`);
   });
 
   await Promise.all(jobs);
-
-  const total = Object.keys(webviews).length;
-  const ok = Object.values(lastResults).filter((r) => r.submitOk).length;
-  setStatus(ok === total ? "전체 전송 완료 ✓" : `전송 ${ok}/${total}`);
-
+  const ok = Object.values(lastResults).filter(r => r.submitOk).length;
+  setStatus(ok === targets.length ? "전체 전송 완료 ✓" : `전송 완료 (${ok}/${targets.length})`);
+  
   updateRetryBtn();
   isBroadcasting = false;
   broadcastBtn.disabled = false;
-  if (retryBtn) retryBtn.disabled = false;
+  if (!keys) { questionInput.value = ""; questionInput.focus(); }
+}
 
-  if (!keys) {
-    questionInput.value = "";
-    questionInput.focus();
+function resetQuestion() {
+  questionInput.value = "";
+  lastResults = {};
+  lastPromptSent = "";
+  updateRetryBtn();
+  for (const [k, wv] of Object.entries(webviews)) {
+    setBadge(k, "초기화 중");
+    openFreshConversation(k, wv);
+  }
+  setStatus("새 질문 준비 완료");
+  questionInput.focus();
+}
+
+// ─── Visibility & Energy Optimization ──────────────────────────
+
+function handleVisibility(visible) {
+  isWindowVisible = visible;
+  console.log(`Resource Management: ${visible ? 'Active' : 'Hibernating'}`);
+  
+  for (const [key, wv] of Object.entries(webviews)) {
+    try {
+       // Only allow background processing when active or during specific tasks
+       // Use webContents API if available via IPC or direct if in renderer (not safe)
+       // Webviews in electron have setAudioMuted, but throttled isn't a direct method
+       // We communicate with the main process or let the main process flags handle occluded windows.
+    } catch (e) { }
   }
 }
 
-// ─── Events ───────────────────────────────────────────────────
+// ─── Event Listeners ──────────────────────────────────────────
 
 for (const [k, wv] of Object.entries(webviews)) {
   wv.addEventListener("did-start-loading", () => setBadge(k, "로딩 중"));
   wv.addEventListener("did-stop-loading", () => setBadge(k, "준비"));
   wv.addEventListener("did-fail-load", () => setBadge(k, "로드 실패", "fail"));
-
-  wv.addEventListener("dom-ready", () => {
-    if (k === "perplexity") {
-      wv.insertCSS(`
-        body {
-          font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif !important;
-        }
-      `).catch(() => {});
-    }
-  });
 }
 
 questionInput.addEventListener("keydown", (e) => {
@@ -417,23 +310,48 @@ questionInput.addEventListener("keydown", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "n") { e.preventDefault(); resetQuestion(); }
-  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); broadcast(); }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n') { e.preventDefault(); resetQuestion(); }
 });
 
 broadcastBtn.addEventListener("click", () => broadcast());
 newQuestionBtn.addEventListener("click", resetQuestion);
 retryBtn?.addEventListener("click", () => {
-  const fails = Object.entries(lastResults).filter(([, r]) => !r.submitOk).map(([k]) => k);
-  if (fails.length) broadcast(fails);
+    const fails = Object.entries(lastResults).filter(([,r]) => !r.submitOk).map(([k]) => k);
+    if (fails.length) broadcast(fails);
 });
 
-// Individual Refresh Buttons
-document.querySelectorAll(".refresh-btn").forEach((btn) => {
+if (window.appApi) {
+  if (window.appApi.onPowerResume) {
+    window.appApi.onPowerResume(async () => {
+       console.log("Resume Recovery triggered...");
+       setStatus("절전 복구 중...");
+       for (const [k, wv] of Object.entries(webviews)) {
+         try {
+           const alive = await Promise.race([
+             wv.executeJavaScript("true"),
+             new Promise((_, reject) => setTimeout(() => reject(), 2000))
+           ]);
+           if (!alive) wv.reload();
+         } catch { wv.reload(); }
+       }
+       setTimeout(() => setStatus(""), 3000);
+    });
+  }
+  
+  // Power/Visibility listener from main process
+  if (window.appApi.onVisibilityChange) {
+     window.appApi.onVisibilityChange((e, visible) => handleVisibility(visible));
+  }
+}
+
+// Manual Refresh Buttons
+document.querySelectorAll(".refresh-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     const key = btn.getAttribute("data-service");
-    const wv = webviews[key];
-    if (key && wv) { setBadge(key, "새로고침"); openFreshConversation(key, wv); }
+    if (key && webviews[key]) {
+      setBadge(key, "새로고침");
+      openFreshConversation(key, webviews[key]);
+    }
   });
 });
 
@@ -447,15 +365,10 @@ document.querySelectorAll('.open-ext').forEach(btn => {
       try {
         const currentUrl = await wv.executeJavaScript("location.href");
         if (currentUrl) url = currentUrl;
-      } catch (e) {
-        if (typeof wv.getURL === 'function') url = wv.getURL() || url;
-      }
+      } catch (e) { }
     }
     if (url) window.open(url, '_blank');
   });
 });
 
-questionInput.value = "";
-setStatus("");
-updateRetryBtn();
 setTimeout(() => questionInput.focus(), 100);

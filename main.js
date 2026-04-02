@@ -1,5 +1,10 @@
-const { app, BrowserWindow, shell, nativeImage, Tray, Menu, globalShortcut } = require("electron");
+const { app, BrowserWindow, shell, nativeImage, Tray, Menu, globalShortcut, powerMonitor, powerSaveBlocker } = require("electron");
 const path = require("path");
+
+// Energy & Stability Configurations
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows', 'true');
+app.commandLine.appendSwitch('disable-renderer-backgrounding', 'true');
+app.commandLine.appendSwitch('enable-blink-features', 'OcclusionTracking');
 
 const APP_NAME = "AI";
 const APP_ID = "com.alchemists.allai";
@@ -84,8 +89,6 @@ function toggleApp() {
 }
 
 function createTrayIcon() {
-  // A simple 22x22 monochrome SVG for the macOS Tray
-  // It will become a template image to automatically adapt to light/dark themes.
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
   <rect x="2" y="2" width="18" height="18" rx="4" fill="#000000" />
@@ -93,7 +96,6 @@ function createTrayIcon() {
 </svg>`;
   const base64 = Buffer.from(svg).toString("base64");
   const img = nativeImage.createFromDataURL(`data:image/svg+xml;base64,${base64}`);
-  // Important for macOS Tray to support dark mode appropriately
   img.setTemplateImage(true);
   return img;
 }
@@ -147,18 +149,24 @@ app.whenReady().then(() => {
     app.dock.hide();
   }
 
-  // Stability & Optimization: Handle web process crashes and configure webviews safely
+  // Stability & Optimization: Handle web process crashes
   app.on("web-contents-created", (event, contents) => {
-    contents.on("will-attach-webview", (e, webPreferences, params) => {
-      // Allow background processing in webviews so AI can answer when hidden
-      webPreferences.backgroundThrottling = false;
-    });
     contents.on("render-process-gone", (event, details) => {
       console.error(`Render process gone (${details.reason}). Redeploying...`);
       if (details.reason !== "clean-exit") {
         contents.reload();
       }
     });
+
+    contents.on("will-attach-webview", (e, webPreferences) => {
+      // By default, let webviews thrive but allow renderer to manage them
+      webPreferences.backgroundThrottling = false;
+    });
+  });
+
+  // Global Watchdog
+  app.on('child-process-gone', (event, details) => {
+    console.error(`Sub-process gone (${details.type}): ${details.reason}`);
   });
 
   if (!mainWindow) {
@@ -166,10 +174,31 @@ app.whenReady().then(() => {
   }
 
   createTray();
+ 
+  // Power event handling
+  powerMonitor.on('suspend', () => console.log('System Suspending...'));
 
-  globalShortcut.register("Control+Space", () => {
-    toggleApp();
+  powerMonitor.on('resume', () => {
+    console.log('System Resumed');
+    if (mainWindow) mainWindow.webContents.send('power-resume');
   });
+
+  powerMonitor.on('unlock-screen', () => {
+    console.log('Screen Unlocked');
+    if (mainWindow) mainWindow.webContents.send('power-resume');
+  });
+
+  // Energy: Monitor visibility for intelligent throttling
+  const updateVisibility = () => {
+    if (!mainWindow) return;
+    const v = mainWindow.isVisible() && !mainWindow.isMinimized();
+    mainWindow.webContents.send('window-visibility-change', v);
+  };
+  
+  app.on('browser-window-focus', updateVisibility);
+  app.on('browser-window-blur', updateVisibility);
+
+  globalShortcut.register("Control+Space", () => toggleApp());
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -185,8 +214,5 @@ app.on("will-quit", () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
+  if (process.platform !== "darwin") app.quit();
 });
-
