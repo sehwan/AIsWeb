@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, nativeImage, Tray, Menu, globalShortcut, powerMonitor, ipcMain, session } = require("electron");
+const { app, BrowserWindow, shell, nativeImage, Tray, Menu, globalShortcut, powerMonitor, ipcMain, session, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -168,6 +168,35 @@ function createTray() {
 
   const contextMenu = Menu.buildFromTemplate([
     { label: '창 열기 / 숨기기', click: () => toggleApp() },
+    { type: 'separator' },
+    { 
+      label: '캐시 정리 (로그인 유지)', 
+      click: async () => {
+        await performCleanup('only');
+        if (mainWindow) {
+          mainWindow.webContents.send('status-message', "캐시 정리가 완료되었습니다.");
+        }
+      } 
+    },
+    { 
+      label: '전체 초기화 (로그아웃 포함)', 
+      click: async () => {
+        const choice = dialog.showMessageBoxSync({
+          type: 'warning',
+          buttons: ['취소', '초기화 실행'],
+          defaultId: 0,
+          title: '전체 초기화 확인',
+          message: '모든 로그인 정보와 데이터가 삭제됩니다. 계속하시겠습니까?',
+        });
+        
+        if (choice === 1) {
+          await performCleanup('all');
+          if (mainWindow) {
+            mainWindow.webContents.send('status-message', "전체 데이터가 초기화되었습니다.");
+          }
+        }
+      } 
+    },
     { type: 'separator' },
     {
       label: '종료하기', click: () => {
