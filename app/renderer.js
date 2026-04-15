@@ -7,6 +7,8 @@ const questionInput = document.getElementById("question");
 const broadcastBtn = document.getElementById("broadcastBtn");
 const newQuestionBtn = document.getElementById("newQuestionBtn");
 const retryBtn = document.getElementById("retryBtn");
+const clearCacheBtn = document.getElementById("clearCacheBtn");
+const resetAllBtn = document.getElementById("resetAllBtn");
 const statusEl = document.getElementById("status");
 
 const webviews = {
@@ -281,6 +283,26 @@ function resetQuestion() {
   questionInput.focus();
 }
 
+async function handleCleanup(type) {
+  if (type === 'all') {
+    if (!confirm("모든 로그인 정보와 데이터가 초기화됩니다. 계속하시겠습니까?")) return;
+  }
+  
+  setStatus(type === 'all' ? "전체 초기화 중..." : "캐시 정리 중...");
+  try {
+    const ok = await window.appApi.clearCache(type);
+    if (ok) {
+      setStatus(type === 'all' ? "전체 초기화 완료 - 로그인이 해제됩니다." : "캐시 정리 완료");
+      // Reload all webviews to apply changes
+      for (const wv of Object.values(webviews)) wv.reload();
+    }
+  } catch (e) {
+    setStatus("정리 실패");
+    console.error(e);
+  }
+  setTimeout(() => setStatus("연결됨"), 3000);
+}
+
 // ─── Visibility & Energy Optimization ──────────────────────────
 
 function handleVisibility(visible) {
@@ -320,6 +342,9 @@ retryBtn?.addEventListener("click", () => {
     if (fails.length) broadcast(fails);
 });
 
+clearCacheBtn?.addEventListener("click", () => handleCleanup('only'));
+resetAllBtn?.addEventListener("click", () => handleCleanup('all'));
+
 if (window.appApi) {
   if (window.appApi.onPowerResume) {
     window.appApi.onPowerResume(async () => {
@@ -341,6 +366,13 @@ if (window.appApi) {
   // Power/Visibility listener from main process
   if (window.appApi.onVisibilityChange) {
      window.appApi.onVisibilityChange((e, visible) => handleVisibility(visible));
+  }
+  
+  if (window.appApi.onStatusMessage) {
+    window.appApi.onStatusMessage((msg) => {
+      setStatus(msg);
+      setTimeout(() => setStatus("연결됨"), 5000);
+    });
   }
 }
 

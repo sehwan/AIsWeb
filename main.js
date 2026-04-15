@@ -1,5 +1,6 @@
-const { app, BrowserWindow, shell, nativeImage, Tray, Menu, globalShortcut, powerMonitor, powerSaveBlocker } = require("electron");
+const { app, BrowserWindow, shell, nativeImage, Tray, Menu, globalShortcut, powerMonitor, ipcMain, session } = require("electron");
 const path = require("path");
+const fs = require("fs");
 
 // Energy & Stability Configurations
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows', 'true');
@@ -11,6 +12,61 @@ const APP_ID = "com.alchemists.allai";
 let mainWindow = null;
 let tray = null;
 let isQuiting = false;
+
+const PARTITIONS = [
+  "persist:perplexity",
+  "persist:gemini",
+  "persist:claude",
+  "persist:chatgpt"
+];
+
+async function performCleanup(type = 'only') {
+  console.log(`Starting cleanup: ${type}`);
+  for (const partition of PARTITIONS) {
+    const ses = session.fromPartition(partition);
+    try {
+      if (type === 'all') {
+        // Clear everything including cookies and localStorage
+        await ses.clearStorageData();
+      } else {
+        // Clear cache and cachestorage only (keep logins)
+        await ses.clearCache();
+        await ses.clearStorageData({
+          storages: ['cachestorage', 'appcache', 'shadercache']
+        });
+      }
+    } catch (err) {
+      console.error(`Failed to clean partition ${partition}:`, err);
+    }
+  }
+  
+  // Update last cleanup date
+  const cleanupInfoPath = path.join(app.getPath("userData"), "last-cleanup.json");
+  try {
+    fs.writeFileSync(cleanupInfoPath, JSON.stringify({ lastDate: Date.now() }));
+  } catch (err) {
+    console.error("Failed to save cleanup date:", err);
+  }
+}
+
+async function checkAutoCleanup() {
+  const cleanupInfoPath = path.join(app.getPath("userData"), "last-cleanup.json");
+  let lastDate = 0;
+  if (fs.existsSync(cleanupInfoPath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(cleanupInfoPath, "utf8"));
+      lastDate = data.lastDate || 0;
+    } catch (e) {}
+  }
+
+  const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+  if (Date.now() - lastDate > TWO_WEEKS_MS) {
+    console.log("Auto-cleanup triggered (2 weeks passed)");
+    await performCleanup('only'); // Auto cleanup always keeps logins
+    return true;
+  }
+  return false;
+}
 
 function createAppIcon() {
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
@@ -174,6 +230,20 @@ app.whenReady().then(() => {
   }
 
   createTray();
+  
+  // Handle manual cleanup requests
+  ipcMain.handle('clear-cache', async (event, type) => {
+    await performCleanup(type);
+    return true;
+  });
+
+  // Check for auto-cleanup on startup
+  setTimeout(async () => {
+    const autoDone = await checkAutoCleanup();
+    if (autoDone && mainWindow) {
+      mainWindow.webContents.send('status-message', "자동 캐시 정리가 수행되었습니다.");
+    }
+  }, 3000);
  
   // Power event handling
   powerMonitor.on('suspend', () => console.log('System Suspending...'));
