@@ -161,7 +161,7 @@ function createTray() {
   tray = new Tray(icon);
 
   if (process.platform === "darwin") {
-    tray.setTitle("AI");
+    tray.setTitle("AI+");
   } else {
     tray.setToolTip(APP_NAME);
   }
